@@ -1,0 +1,24 @@
+---
+title: "Urban Mobility Analysis"
+author: Andrew BOU ISSA, Tam Tran, Dylan Nunes, Sina Pourasgari
+date: "20.01.2024"
+output: 
+  rmdformats::readthedown
+---
+
+```{r child='data_preparation.Rmd'}
+```
+
+
+
+```{r child='Insights.Rmd'}
+```
+
+```{r child='Household_car_ownership.Rmd'}
+```
+
+```{r child='car_usage.Rmd'}
+```
+
+```{r child='machine_learning.Rmd'}
+```

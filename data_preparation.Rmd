@@ -1,0 +1,586 @@
+```{r, echo=FALSE}
+rm(list=ls())
+```
+
+```{r setup, include=FALSE}
+## Libraries
+## You may have to install these libraries first 
+## with the tab on bottom right panel : "Packages" ; click install
+## or : install.packages("ggplot2")   - don't forget the ""
+#library(ggplot2)
+## library(knitr) # It is better not to load knit but make direct calls to the settings
+
+library(formatR)
+library(rmdformats)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+library(skimr)
+library(readxl)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(readxl)
+library(readr)
+library(patchwork)
+#install.packages("plotly")
+
+# For dev version
+#install.packages("VIM")
+#devtools::install_github("haozhu233/kableExtra")
+library(kableExtra)
+library(devtools)
+library(VIM)
+
+## Global chunk options
+knitr::opts_chunk$set(
+  echo = TRUE,
+  eval = TRUE,
+  prompt = FALSE,
+  tidy = TRUE,
+  comment = NA,
+  message = FALSE,
+  warning = FALSE
+)
+## Knit options
+knitr::opts_knit$set(
+  width = 75
+)
+```
+
+
+```{r Load_Data, eval=TRUE, echo=FALSE}
+load("allgreD.RData")
+load("allgreI.RData")
+load("allgreM.RData")
+```
+
+# Literature Review
+
+Our primary source of insight and conceptual foundation was the OECD's EPIC (Environmental Policies and Individual Behaviour Change) survey [1], conducted across three rounds (2008 to 2022), with an average of 13,000 observations per round and a minimum of 10 developed countries. This study provided insights into household decision-making and transport behaviors, which guided the selection of our parameters and segmentation approach.
+
+Specifically, we followed EPIC's structure to incorporate socio-demographic variables like car ownership, household income, and the presence of children, as a foundation for our analysis. Additionally, we used this article as our reference for segmentation by trip characteristics (e.g., origin-destination regions, purpose). This methodology enabled us to have more homogeneous datasets to better capture the effects of the parameters of interest. Here is a sample outcome of the EPIC survey, which we tried to reproduce in the preliminary parts of our study.
+
+![Choice of commuting mode in the EPIC survey [1]](./LitRevImg1.png){width="75%"}
+
+
+
+# Research Statement
+
+This study examines two main aspects related to car usage within households: what factors influence a household's decision to own a car, and what factors determine how car owners decide to use their car as their primary mode of transportation. 
+
+\newline
+
+We sought to understand the key drivers behind car ownership and the variables that influence car usage among those who own one.
+
+
+# Data Preparing{.tabset} 
+## Dataset{.tabset}
+### AllgreD
+```{r, echo=FALSE}
+allgreD <- allgreD %>%
+  select(-zoneres.y.1, -mode)
+D_names <- names(allgreD)
+
+D_labels <- c("Observation_Drawing_Number","Household_Number",
+                    "Individual_Number_in_Household", "Trip_Number_for_Individual",
+                    "Residential_Zone_Number","Trip_Purpose_at_Origin",
+                    "Accompanied_Persons_Purpose_at_Origin","Origin_Zone_of_Trip",
+                    "Departure_Time_Hour","Departure_Time_Minute",
+                    "Trip_Purpose_at_Destination","Accompanied_Persons_Purpose_at_Destination",
+                    "Number_of_Stops_During_Trip","Destination_Zone_Number","Arrival_Time_Hour",
+                    "Arrival_Time_Minute","Trip_Duration_Declared",
+                    "Number_of_Mechanized_Modes_Used","Transport_Costs_Covered",
+                    "Travelled_Distance_As_Crow_Flies","Travelled_Distance_Declared","Trip_Element_Number",
+                    "Walking_Time_At_Origin","Zone_At_Origin_of_Stop",
+                    "Zone_At_Destination_of_Stop","Walking_Time_At_Destination",
+                    "Vehicle_Number_Used","Number_of_Occupants_in_Vehicle",
+                    "Parking_Location_Used","Parking_Type_Used","Parking_Duration",
+                    "Highway_Usage","Public_Transport_Pass_Holder","Household_ID",
+                    "Individual_ID","Trip_ID","Stop_ID","Number_of_Stops_in_Trip",
+                    "Modified_Transport_Mode","Estimated_Transport_Cost",
+                    "Aggregated_Transport_Mode","UN","DEST",
+                    "ORIG","Simplified_Purpose_at_Origin",
+                    "Simplified_Purpose_at_Destination"
+)
+
+
+D_missing_percent <- sapply(allgreD, function(x) {
+  sum(is.na(x)) / length(x) * 100
+})
+ 
+D_variables <- data.frame(
+  Label = D_labels,
+  Missing_Percentage = D_missing_percent
+) 
+
+D_variables %>%
+  arrange(desc(Missing_Percentage)) %>%
+  kable() %>%
+  kable_minimal()%>%
+  kable_paper(full_width = F) %>%
+  row_spec(c(1:4, 22, 26), extra_css = "color: red;") %>%
+  row_spec(43:45, extra_css = "color: red;") %>%
+  row_spec(6:10,28, extra_css = "color: blue;") %>%
+  row_spec(13:17,28, extra_css = "color: green;")
+```
+
+
+
+### AllgreI
+```{r, echo=FALSE}
+I_names <- names(allgreI)
+
+I_labels <- c("Observation_Drawing_Number","Household_Number","Individual_Number_in_Household",
+              "Residential_Zone_Number","Gender","Relationship_to_Household_Reference","Age",
+              "Has_Mobile_Phone","Has_Email","Has_Driving_License",
+              "Last_Educational_Institution_Attended","Main_Occupation","Secondary_Occupation",
+              "Socio_Professional_Category","Has_Public_Transport_Subscription",
+              "Public_Transport_Subscription_Validity","Works_or_Studies_at_Home",
+              "Work_or_Study_Location_Zone","Has_Access_to_Private_Vehicle",
+              "General_Parking_Problems","Parking_Difficulties_at_Workplace",
+              "Bicycle_Use_Frequency","Motorized_Two_Wheeler_Use_Frequency_Type_1",
+              "Motorized_Two_Wheeler_Use_Frequency_Type_2","Car_Use_Frequency_as_Driver",
+              "Car_Use_Frequency_as_Passenger","Urban_Transport_Use_Frequency",
+              "Tramway_Use_Frequency","Other_Urban_Transport_Use_Frequency",
+              "Transisere_Transport_Use_Frequency","Regional_Train_Use_Frequency",
+              "Activity_on_Previous_Day","Household_ID","Individual_ID","Number_of_Trips_Made",
+              "Total_Daily_Travel_Time","Unknown",
+              "Aggregated_Socio_Economic_Status","Grouped_Socio_Professional_Category"
+)
+
+
+I_missing_percent <- sapply(allgreI, function(x) {
+  sum(is.na(x)) / length(x) * 100
+}) 
+
+I_variables <- data.frame(
+  Label = I_labels,
+  Missing_Percentage = I_missing_percent
+)
+
+
+I_variables %>%
+  arrange(desc(Missing_Percentage)) %>%
+  kable() %>%
+  kable_minimal()%>%
+  kable_paper(full_width = F) %>%
+  row_spec(c(1:3,7,9:17,18,19,21,26, 28:31,35), extra_css = "color: red;")
+```
+
+
+### AllgreM
+
+```{r, echo=FALSE}
+M_names <- names(allgreM)
+
+M_labels <- c("Household Code","Household Size","Residence Area","Day of Travel","Housing Type",
+                        "Occupancy Type","Dept of Reference SNCF Station",
+                        "Postal Code of Reference SNCF Station","Has Telephone","Listed in Directory",
+                        "Has Internet","Number of Cars Available","Type of Car 1","Fuel Type of Car 1",
+                        "Year of Car 1","Engine Power of Car 1","Ownership Status of Car 1",
+                        "Parking Location of Car 1","Parking Type of Car 1","Type of Car 2","Fuel Type of Car 2",
+                        "Year of Car 2","Engine Power of Car 2","Ownership Status of Car 2",
+                        "Parking Location of Car 2","Parking Type of Car 2","Type of Car 3","Fuel Type of Car 3",
+                        "Year of Car 3","Engine Power of Car 3","Ownership Status of Car 3",
+                        "Parking Location of Car 3","Parking Type of Car 3","Type of Car 4","Fuel Type of Car 4",
+                        "Year of Car 4","Engine Power of Car 4", "Ownership Status of Car 4",
+                        "Parking Location of Car 4","Parking Type of Car 4","Number of Bikes",
+                        "Number of Motorcycles","Management Coefficient","Household ID","Individual ID",
+                        "Trip ID","Stop ID","Number of People","Total Trips","Total Daily Travel Time"
+)
+
+
+M_missing_percent <- sapply(allgreM, function(x) {
+  sum(is.na(x)) / length(x) * 100
+}) 
+
+M_variables <- data.frame(
+  Label = M_labels,
+  Missing_Percentage = M_missing_percent
+)
+
+
+M_variables %>%
+  kable() %>%
+  kable_minimal()%>%
+  kable_paper(full_width = F) %>%
+  row_spec(c(1:3,9:11,13,14:16,18:23,25:30,32,33:37,39,40,43,45,46), extra_css = "color: red;")
+
+```
+
+## Following steps made
+
+> **Select our variables and merge the datasets**
+
+```{r, include=FALSE}
+AllgreD_selected <- c(
+  "ORIG", "DEST", "D12", "UN", "ZONE_D_TRAJ", "mode_depl_ag", "zoneorig", "heuredep", "mindep",
+  "zonedest", "heurearr", "minarr", "duree", "prisecharge", "D13", "NO_TRAJ",
+  "ZONE_A_TRAJ", "TPS_MAP_ARV", "NAT_STAT", "ntraj","id_traj" ,"mode_V2", "Couteff",
+  "durstat", "TPS_MAP_DEP", "nbmodemec", "autoroute", "mot_d_red", "mot_o_red",
+  "tir", "zoneres.x.1", "id_men", "id_pers", "id_depl", "NB_OCCU", "LIEU_STAT","NUM_VEH"
+)
+
+
+AllgreD_trimmed <- allgreD[, AllgreD_selected]
+AllgreI_selected <- c(
+  "id_men","id_pers", "cspgroup", "OCCU1", "OCCU2", "age", "permis", "zonetrav",
+  "dispovp", "btt", "lien","sexe", "ABO_TC", "nbd", "PBM_STAT", "csp", "statut2"
+)
+
+
+
+# Select only these variables from AllgreI
+AllgreI_trimmed <- allgreI[, AllgreI_selected]
+
+AllgreM_selected <- c(
+  "jourdepl", "VP_DISPO", "NB_velo", "NB_2Rm", "nb_pers", "nbt2", "btt2",
+  "TYPE_HAB", "TYPE_OCU", "POSSES1", "POSSES2", "POSSES3", "POSSES4", 
+  "Gare2", "Gare5", "id_men"
+)
+
+# Select only these variables from AllgreM
+AllgreM_trimmed <- allgreM[, AllgreM_selected]
+
+
+#person_household_data <- AllgreI_trimmed %>%
+#  left_join(AllgreM_trimmed, by = "id_men")
+#merged_data <- AllgreD_trimmed %>%
+#  left_join(person_household_data, by = "id_pers")
+
+
+
+allgreD_updated <- AllgreD_trimmed %>%
+  left_join(AllgreM_trimmed, by = "id_men")
+# Merge variables from allgreI to the updated allgreD
+merged_data <- allgreD_updated %>%
+  left_join(AllgreI_trimmed, by = "id_pers")
+
+merged_data <- merged_data %>%
+  rename(
+    id_men =id_men.x,
+    crownTravel_Distance = D12,
+    Area_at_origin_of_stop = ZONE_D_TRAJ,
+    travel_mode = mode_depl_ag,
+    departure_hour = heuredep,
+    departure_minute = mindep,
+    arrival_hour = heurearr,
+    arrival_minute = minarr,
+    declared_trip_duration = duree,
+    covered_trip_cost = prisecharge,
+    actualTravel_distance = D13,
+    trip_number = NO_TRAJ,
+    Area_at_destination_of_stop = ZONE_A_TRAJ,
+    walk_time_at_destination = TPS_MAP_ARV,
+    parking_type = NAT_STAT,
+    number_of_stops = ntraj,
+    cost_estimation = Couteff,
+    parking_duration = durstat,
+    walk_time_at_origin = TPS_MAP_DEP,
+    highway_used = autoroute,
+    purpose_at_destination = mot_d_red,
+    purpose_at_origin = mot_o_red,
+    residence_zone_number = tir,
+    residence_area = zoneres.x.1,
+    parking_location = LIEU_STAT,
+    work_zone = zonetrav,
+    car_availability = dispovp,
+    daily_travel_time = btt,
+    relationship_status = lien,
+    public_trans_subscription = ABO_TC,
+    number_of_trips = nbd,
+    parking_problems = PBM_STAT,
+    socio_category = csp,
+    socio_category_group = cspgroup,
+    employment_status = statut2,
+    trip_day = jourdepl,
+    number_of_cars = VP_DISPO,
+    num_bikes = NB_velo,
+    num_motorcycles = NB_2Rm,
+    num_people = nb_pers,
+    housing_type = TYPE_HAB,
+    occupancy_type = TYPE_OCU,
+    dept_sncf_station = Gare2,
+    postal_sncf_station = Gare5,
+    stop_id = id_traj
+  
+  )
+
+merged_data <- select(merged_data, -id_men.y)
+
+```
+
+
+```{r, include=FALSE}
+variables_to_factorize <- c(
+  "ORIG", "DEST", "UN", "Area_at_origin_of_stop", "travel_mode", "zoneorig", "zonedest", "covered_trip_cost",
+  "trip_number", "Area_at_destination_of_stop", "parking_type", "stop_id", "mode_V2", "highway_used",
+  "residence_zone_number","residence_area", "id_men", "id_pers", "id_depl", "parking_location", "trip_day",
+  "housing_type","occupancy_type", "POSSES1", "POSSES2", "POSSES3", "POSSES4", "dept_sncf_station",
+  "postal_sncf_station", "socio_category_group", "OCCU1", "OCCU2", "permis", "work_zone", "car_availability",
+  "relationship_status", "sexe", "public_trans_subscription", "parking_problems", "socio_category", 
+  "employment_status","nbmodemec"
+)
+
+# Factorizing variables
+merged_data <- merged_data %>%
+  mutate(across(all_of(variables_to_factorize), as.factor))
+# Check the structure of the dataset to confirm factorization
+dataset <- merged_data
+# Analyze proportion of missing mode_depl_ag
+missing_mode_proportion <- sum(is.na(dataset$travel_mode)) / nrow(dataset) * 100
+cat("Proportion of missing mode_depl_ag: ", missing_mode_proportion, "%\n")
+
+if (missing_mode_proportion < 5) {
+  # If missing proportion is small, remove rows with NA in mode_depl_ag
+  dataset <- dataset %>% filter(!is.na(travel_mode))
+}
+
+# Verify NA count for mode_depl_ag
+cat("Remaining NA count for mode_depl_ag: ", sum(is.na(dataset$travel_mode)), "\n")
+
+dataset <- dataset %>%
+  group_by(id_men) %>%
+  mutate(Permis_mng = ifelse(any(as.numeric(as.character(permis)) == 1, na.rm = TRUE), 
+                             1, 
+                             min(as.numeric(as.character(permis)), na.rm = TRUE))) %>%
+  ungroup()
+
+```
+
+> **Factorize the variables needed**
+`r variables_to_factorize`
+
+```{r, include=FALSE}
+#save(merged_data, file = "merged_data.RData")
+#load("merged_data.RData")
+#load("dataset.Rdata")
+
+data_allgre <- dataset
+
+
+
+data_allgre <- data_allgre %>%
+  mutate(real_travel_mode = ifelse(travel_mode == "VP", "VP", "Autre"))
+
+data_allgre <- data_allgre %>%
+  mutate(
+    # Combine departure hour and minute into a time format
+    departure_time = sprintf("%02d:%02d", departure_hour, departure_minute),
+    
+    # Combine arrival hour and minute into a time format
+    arrival_time = sprintf("%02d:%02d", arrival_hour, arrival_minute)
+  ) %>%
+  select(-departure_hour, -departure_minute,-arrival_hour, -arrival_minute)
+
+```
+
+> **Create new variables**
+
++ *real_travel_mode = binary variable "VP", "Autre"*
+The new data distribution for this binary variable is as follows: `r table(data_allgre$real_travel_mode)`
+
++ *Departure_time*
+
++ *Arrival_time*
+
++ *Filter out missing values from travel_mode(1258)*
+
+```{r, include=FALSE}
+summary(data_allgre)
+```
+
+```{r, include=FALSE}
+data_allgre <- data_allgre %>%
+  rename(Number_of_trips_of_the_person = nbt2,
+         Daily_travel_time = btt2)
+
+imputing_missing <- data_allgre %>%
+  select(travel_mode,parking_duration,highway_used) %>%
+  filter(!is.na(parking_duration)) %>%
+  group_by(travel_mode) %>%
+  summarise(non_missing_values = n())
+imputing_missing
+imputing_missing <- data_allgre %>%
+  select(travel_mode,parking_duration,highway_used) %>%
+  filter(!is.na(parking_duration) & travel_mode != "VP") %>%
+  summarise(
+    total_observations = n(),
+    parking_duration_0 = sum(parking_duration == 0, na.rm = TRUE),
+    highway_used_2 = sum(highway_used == 2, na.rm = TRUE)
+  )
+imputing_missing
+#So we can see, The most values for these 2 columns are for VP travel mode. And for Non-Vp all values are almost leading to 0 parking_duration and non highway used. So finally we can impute all the missing values for no VP by 0 and 2 respectively
+#So let's replace them
+data_allgre <- data_allgre %>%
+  mutate(parking_duration = ifelse(is.na(parking_duration) & travel_mode != "VP", 0,parking_duration),
+         highway_used = ifelse(is.na(highway_used) & travel_mode != "VP", 2, highway_used))
+
+
+#Number_of_stops
+
+data_allgre <- data_allgre %>%
+  mutate(number_of_stops = ifelse(is.na(stop_id), 0, number_of_stops),
+         Area_at_origin_of_stop = ifelse(is.na(stop_id), "no stop", Area_at_origin_of_stop),
+         Area_at_destination_of_stop = ifelse(is.na(stop_id), "no stop", Area_at_destination_of_stop),
+         walk_time_at_destination = ifelse(is.na(stop_id), "no stop", walk_time_at_destination),
+         walk_time_at_origin = ifelse(is.na(stop_id), "no stop", walk_time_at_origin),
+         stop_id = ifelse(is.na(stop_id), "no stop", stop_id))
+
+data_allgre <- data_allgre %>%
+  mutate(car_at_your_disposal = ifelse(number_of_cars >= num_people, "YES", "NO"))
+
+  
+
+data_allgre <- data_allgre %>%
+  mutate(car_availability =as.numeric(as.character(data_allgre$car_availability))) %>%
+  group_by(id_men, id_pers) %>%
+  mutate(
+    car_availability = case_when(
+      # Condition 1: Household has car_at_your_disposal = YES
+      car_at_your_disposal == "YES" & real_travel_mode == "VP" & is.na(car_availability) ~ 1,
+      car_at_your_disposal == "YES" & real_travel_mode == "Autre" & is.na(car_availability) ~ 2,
+      
+      # Condition 2: Household has car_at_your_disposal = NO
+      car_at_your_disposal == "NO" & number_of_cars > 0 & real_travel_mode == "VP" & is.na(car_availability) ~ 1,
+      car_at_your_disposal == "NO" & number_of_cars > 0 & real_travel_mode == "Autre" & is.na(car_availability) ~ 2,
+      car_at_your_disposal == "NO" & number_of_cars == 0 & is.na(car_availability) ~ 3,
+      
+      # Retain existing non-NA values
+      TRUE ~ car_availability
+    )
+  ) %>%
+  ungroup()
+```
+
+> **Imputing missing values**
+
++  *`number_of_stops`, `Area_at_origin_of_stop`,`Area_at_destination_of_stop`,`walk_time_at_destination`,`walk_time_at_origin`,`stop_id`*. If there is no Stop => We can replace missing values with `no stop`
+
++ *`parking_duration` and `highway_used`* => If the person didn't travel by car ==> No highway used, no parking used
+
++ *`car_availability`* => We used the travel_mode, number_of_cars, num_people to impute those values
+
+```{r, include=FALSE}
+missing_percent <- sapply(data_allgre, function(x) {
+  sum(is.na(x)) / length(x) * 100
+}) 
+
+final_variables <- data.frame(
+  Missing_Percentage = missing_percent
+)
+
+
+final_variables %>%
+  arrange(desc(Missing_Percentage)) %>%
+  kable() %>%
+  kable_minimal()%>%
+  kable_paper(full_width = F)
+```
+
+## Deal with trip loops{.tabset}
+
+```{r, echo=FALSE}
+trip_loop <- data_allgre %>%
+  group_by(id_pers) %>%
+  summarise(unique_days = length(unique(trip_day)))
+
+trip_analysis <- data_allgre %>%
+  group_by(id_pers) %>%
+  arrange(id_pers, departure_time) %>%  # Sort by person and departure time
+  mutate(
+    trip_number = row_number(),  # Assign trip sequence number
+    total_trips = n()            # Total trips for each person
+  ) %>%
+  summarise(
+    total_trips = max(total_trips),                      # Total trips for this person
+    purpose_sequence = paste(purpose_at_destination, collapse = " -> "),  # Combine purposes
+    mode_sequence = paste(travel_mode, collapse = "->")
+  ) 
+
+
+tail(trip_analysis) %>% kable() %>% kable_minimal()
+```
+
+### Old data
+
+```{r, echo=FALSE}
+filtered_data <- data_allgre %>%
+  group_by(id_pers) %>%  # Group by person
+  mutate(
+    mode_switch = (travel_mode != lag(travel_mode, default = first(travel_mode))),  # Detect mode switch
+    mode_group = cumsum(mode_switch)  # Create a unique group for each mode sequence
+  ) %>%
+  group_by(id_pers, mode_group) %>%  # Group by person and mode sequence
+  mutate(
+    trip_sequence = row_number(),  # Sequence of trips within the mode group
+    total_trips_same_mode = n(),  # Total trips in the mode group
+    total_crownTravel_distance = sum(crownTravel_Distance, na.rm = TRUE),  # Sum of distances (crown)
+    total_actualTravel_distance = sum(actualTravel_distance, na.rm = TRUE),  # Sum of distances (actual)
+    total_declared_trip_duration = sum(declared_trip_duration, na.rm = TRUE),  # Sum of durations
+    end_arrival_time = max(arrival_time, na.rm = TRUE)
+  ) %>%
+  ungroup()
+
+
+
+new_data <- filtered_data %>%
+  filter(id_pers == "101019001") %>%
+  select(id_pers, departure_time, travel_mode, mode_switch, mode_group, trip_sequence, total_trips_same_mode,total_crownTravel_distance,total_actualTravel_distance,total_declared_trip_duration,departure_time, arrival_time, end_arrival_time)
+new_data %>% kable() %>% kable_styling()
+
+```
+
+### New data
+```{r, echo=FALSE}
+
+filtered_data <- filtered_data%>%
+  filter(trip_sequence == 1) %>%  # Keep only the first trip in the sequence
+  ungroup()  # Remove grouping
+
+new_data <- filtered_data %>%
+  filter(id_pers == "101019001") %>%
+  select(id_pers, travel_mode, mode_switch, mode_group, trip_sequence, total_trips_same_mode,total_crownTravel_distance,total_actualTravel_distance,total_declared_trip_duration,departure_time, arrival_time, end_arrival_time)
+new_data %>% kable() %>% kable_styling()
+```
+
+
+
+### Total Trips with Same Mode
+
+```{r, echo=FALSE}
+trips_number <- filtered_data %>%
+  group_by(total_trips_same_mode) %>%
+  summarise(
+    car_users = sum(real_travel_mode == "VP"),  # Count car users
+    non_car_users = sum(real_travel_mode == "Autre"),  # Count non-car users
+    percentage_car_users = (car_users / (car_users + non_car_users)) * 100  # Calculate percentage
+  )
+
+
+ggplot(trips_number, aes(x = total_trips_same_mode, y = percentage_car_users)) +
+  geom_line(color = "blue", size = 1) +  # Line plot
+  geom_point(color = "red", size = 2) +  # Points for each data
+  labs(
+    title = "Percentage of Car Users by Total Trips with Same Mode",
+    x = "Total Trips with Same Mode",
+    y = "Percentage of Car Users (%)"
+  ) +
+  scale_x_continuous(breaks = 1:16) +  # Set x-axis breaks from 1 to 16
+  theme_minimal() +
+  theme(
+    text = element_text(size = 12),
+    plot.title = element_text(hjust = 0.5, face = "bold")
+  )
+
+filtered_data <- filtered_data %>%
+  filter(total_trips_same_mode <= 13 )
+```
+
+The analysis reveals a strong positive relationship between the number of consecutive trips made with the same mode and the percentage of car users. Specifically, when individuals anticipate making multiple trips consecutively, the likelihood of choosing a car increases significantly. The percentage of car users rises from 38% for a single trip to its peak value as the total trips made with the same mode approach 16. This trend underscores the preference for cars in scenarios involving repeated, consistent travel.
+
+\newline
+
+We then filtered out trips that have more than 13 consecutive trips using the car, because these probably indicates for taxi drivers that we don't want to consider in our analysis
+

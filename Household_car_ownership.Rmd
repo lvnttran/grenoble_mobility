@@ -1,0 +1,384 @@
+# Factors Influencing Household Car Ownership{.tabset}
+
+In this analysis, we examined several key factors influencing car ownership using variables from a research paper on the same topic. These factors include the number of children and adults in the household, urban area, income, and whether the individual lives alone
+
+\newline
+
+To do so, we created several new variables: `Age_group`, categorized as teenagers, young adults, adults, and seniors based on the age variable; `Urban_area`, defined as major city (for Grenoble or Voiron), suburb (for St Marcellin or La Touvet), and rural (for locations outside any city); and `Income`, derived from the combination of the csp variable (representing profession) and occu1 and occu2 (indicating employment status such as full-time, part-time, or student). These new variables were essential in understanding the factors influencing car ownership.
+
+## % Diffrence table
+
+```{r, include=FALSE}
+#Adding the purpose category
+filtered_data <- filtered_data %>%
+  mutate(
+    trip_category = case_when(
+      purpose_at_destination %in% c("TRAVAIL", "Professionnel") ~ "Work",
+      purpose_at_destination %in% c("Ecole Primaire", "C.E.S.-LYCEE") ~ "Child Education",
+      purpose_at_destination %in% c("UNIVERSITE") ~ "University",
+      purpose_at_destination %in% c("ACHAT", "LOISIR", "ACCOMPAGNEMENT", "AUTRES") ~ "Leisure",
+      purpose_at_destination == "DOMICILE" ~ "Home"
+    )
+  )
+
+#Addint the age group
+filtered_data <- filtered_data %>%
+  mutate(
+    age_group = case_when(
+      age > 0 & age < 18 ~ "Teenagers",
+      age >= 18 & age < 35 ~ "Young Adults",
+      age >= 35 & age < 55 ~ "Adults",
+      age >= 55 & age < 100 ~ "Seniors"
+    ))
+
+#Adding the income
+filtered_data <- filtered_data %>%
+  mutate(
+    work_status_group = case_when(
+      OCCU1 == 1 ~ "Full-Time Employment",  # OCCU1 == 1 → Full-Time Employment
+      OCCU1 %in% c(2, 3) | (OCCU1 %in% c(4, 5, 6, 7, 8) & OCCU2 == 1) ~ "Part-Time Employment",  # Grouped part-time employment
+      OCCU1 %in% c(4, 5, 6, 7, 8) & OCCU2 != 1 ~ "Unemployed",  # OCCU1 in [4, 5, 6, 7, 8] and OCCU2 != 1 → Unemployed
+      OCCU1 == 9 ~ "Other",  # OCCU1 == 9 → Other
+      TRUE ~ "Unknown"  # Catch-all for any undefined conditions
+    )
+  )
+
+
+
+
+# Define the occupation codes for each category
+filtered_data <- filtered_data %>%
+  mutate(
+    work_group = case_when(
+      socio_category %in% c(21, 22, 23, 31, 32, 36) ~ "High Income",  
+      socio_category %in% c(10,41, 46, 47, 48, 51, 54, 55, 56, 99) ~ "Average Income",
+      socio_category %in% c(61, 66, 69, 81, 82) ~ "Low Income",
+      socio_category %in% c(83, 84, 85, 86, 87, 90) ~ "No Income",
+      TRUE ~ "Average Income Jobs"  # All other categories fall under Average income jobs
+    )
+  )
+table(filtered_data$work_group, filtered_data$work_status_group)
+filtered_data$income <- with(filtered_data, 
+  ifelse(
+    # High Income Criteria
+    work_group == "High Income" & work_status_group == "Full-Time Employment", "High Income",
+    
+    ifelse(
+      # Medium Income Criteria
+      (work_group == "High Income" & work_status_group == "Part-Time Employment") |
+      (work_group == "Average Income" & work_status_group %in% c("Full-Time Employment", "Other")) |
+      (work_group == "Low Income" & work_status_group == "Full-Time Employment"), "Medium Income",
+      
+      ifelse(
+        # Low Income Criteria
+        (work_group == "High Income" & work_status_group == "Other") |
+        (work_group == "Average Income" & work_status_group == "Part-Time Employment") |
+        (work_group == "Low Income" & work_status_group %in% c("Part-Time Employment", "Other")) |
+        (work_group %in% c("High Income", "Average Income", "Low Income") & work_status_group == "Unemployed"), "Low Income",
+        
+        # No Income Criteria
+        "No Income"
+      )
+    )
+  )
+)
+
+filtered_data <- filtered_data %>%
+  mutate(income_value = case_when(
+    work_group == "No Income" ~ 0,
+    work_group == "Low Income" ~ 10,
+    work_group == "Average Income" ~ 50,
+    work_group == "High Income" ~ 80,
+  ))
+table(filtered_data$income_value)
+#Checking when families own a car
+family_possessions <- filtered_data %>%
+  group_by(id_men) %>%
+  summarise(
+    living_alone = ifelse(n_distinct(id_pers) == 1, 1, 0),
+    have_car = as.integer(any(car_availability < 3)),  # Check if any car exists in the household
+    have_alternatives = as.integer(any(num_motorcycles >= 1 | num_bikes >= 1)),
+    residence_area = unique(residence_area),
+    number_of_children = n_distinct(id_pers[age_group == "Teenagers"]),  # Counting distinct teenagers
+    number_of_adults = n_distinct(id_pers[age_group != "Teenagers"]),
+    number_of_adults_group = case_when(  # Create a new column to group adults
+      number_of_adults <= 1  ~ "One adult",
+      number_of_adults == 2 ~ "Two adults",
+      number_of_adults > 2 ~ "Three or more adults"
+    ),
+    numbers_of_members = number_of_children+number_of_adults,
+    income_value = (sum(income_value[!duplicated(id_pers)], na.rm = TRUE)/numbers_of_members)
+    ) %>%
+  mutate(
+    number_of_children = case_when(
+      number_of_children == 0 ~ "No Children",
+      number_of_children == 1 ~ "One Child",
+      number_of_children == 2 ~ "Two Children",
+      number_of_children > 2 ~ "Three or more Children"
+    ),
+    income_value = case_when(
+      income_value == 0 ~"No Income",
+      income_value <= 30 ~ "Low income",
+      income_value <= 60 ~ "Medium income",
+      income_value <= 100 ~ "High income"),
+    urban_area = case_when(
+      residence_area %in% c("inside_grenoble", "inside_voiron") ~ "Major city",
+      residence_area %in% c("inside_la_touvet", "inside_St_Marcellin") ~ "Suburb", 
+      residence_area == "outside_the_city" ~ "Rural"
+    )) %>%
+  select(-residence_area)
+
+
+#Difference for living alone
+car_ownership_alone <- family_possessions %>%
+  group_by(living_alone) %>%
+  summarise(
+    nb_row = n(),
+    car_ownership_rate = mean(have_car) * 100  # Calculate the percentage of households with cars
+  ) %>%
+  arrange(car_ownership_rate)
+
+car_ownership_alone <- car_ownership_alone %>%
+  mutate(
+    percent_change_from_benchmark = paste(
+      round(car_ownership_rate - car_ownership_rate[living_alone == 0], 2), "%")  # Compare to the 0 children group
+  )
+
+
+#% Difference for childrens
+car_ownership_by_children <- family_possessions %>%
+  group_by(number_of_children) %>%
+  summarise(
+    nb_row = n(),
+    car_ownership_rate = mean(have_car) * 100  # Calculate the percentage of households with cars
+  ) %>%
+  arrange(car_ownership_rate)
+
+car_ownership_by_children <- car_ownership_by_children %>%
+  mutate(
+    percent_change_from_benchmark = paste("+", 
+      round(car_ownership_rate - car_ownership_rate[number_of_children == "No Children"], 2), "%")  # Compare to the 0 children group
+  )
+
+#% difference for adults
+car_ownership_by_adult <- family_possessions %>%
+  group_by(number_of_adults_group) %>%
+  summarise(
+    nb_row = n(),
+    car_ownership_rate = mean(have_car) * 100  # Calculate the percentage of households with cars
+  ) %>%
+  arrange(number_of_adults_group)
+
+
+# Calculate the percentage difference in car ownership from the benchmark (0 children)
+# Using the first row (0 children) as the reference
+car_ownership_by_adult <- car_ownership_by_adult %>%
+  mutate(
+    percent_change_from_benchmark = paste("+", car_ownership_rate - car_ownership_rate[car_ownership_by_adult$number_of_adults_group == "One adult"], "%")  # Compare to the 0 children group
+  )
+
+#Difference for residence area
+
+car_ownership_by_area <- family_possessions %>%
+  group_by(urban_area) %>%
+  summarise(
+    nb_rows = n(),
+    car_ownership_rate = mean(have_car) * 100  # Calculate the percentage of households with cars
+  ) %>%
+  arrange(car_ownership_rate)
+
+
+
+car_ownership_by_area <- car_ownership_by_area %>%
+  mutate(
+    urban_area = urban_area,
+    percent_change_from_benchmark = paste("+", car_ownership_rate - car_ownership_rate[car_ownership_by_area$urban_area == "Major city"], "%")  # Compare to the 0 children group
+  )
+
+#Difference for income
+car_ownership_by_income <- family_possessions %>%
+  group_by(income_value) %>%
+  summarise(
+    nb_row = n(),
+    car_ownership_rate = mean(have_car) * 100  # Calculate the percentage of households with cars
+  ) %>%
+  arrange(income_value)
+
+
+
+car_ownership_by_income <- car_ownership_by_income %>%
+  mutate(
+    income_value = income_value,
+    percent_change_from_benchmark = paste("+", car_ownership_rate - car_ownership_rate[car_ownership_by_income$income_value == "No Income"], "%")  # Compare to the 0 children group
+  )
+
+
+
+```
+
+```{r, echo=FALSE}
+variables_to_factorize <- c("living_alone", "have_car", "have_alternatives","number_of_children","number_of_adults_group","income_value","urban_area")
+
+family_possessions <- family_possessions %>%
+  mutate(across(all_of(variables_to_factorize), as.factor))
+chi_test_alone <- chisq.test(table(family_possessions$living_alone, family_possessions$have_car))
+ 
+p_value_alone <- sprintf("%.2e", chi_test_alone$p.value)
+
+car_ownership_alone <- car_ownership_alone %>%
+  mutate(
+    category = "Living alone(Benchmark: No)",
+    group = as.character(living_alone),  # Convert to character
+    chisq.test_p_value = p_value_alone  # Add the p-value to all rows
+  ) %>%
+  select(category, group, percent_change_from_benchmark, chisq.test_p_value)  %>%
+  filter(row_number() != 2)
+
+chi_test_children <- chisq.test(table(family_possessions$number_of_children, family_possessions$have_car))
+ 
+p_value_children <- sprintf("%.2e", chi_test_children$p.value)
+
+car_ownership_by_children <- car_ownership_by_children %>%
+  mutate(
+    category = "Number of Children(Benchmark: No Children in the household)",
+    group = as.character(number_of_children),
+    chisq.test_p_value = p_value_children
+  ) %>%
+  select(category, group, percent_change_from_benchmark,chisq.test_p_value) %>%
+  filter(row_number() != 1)
+
+chi_test_adult <- chisq.test(table(family_possessions$number_of_adults_group, family_possessions$have_car))
+ 
+p_value_adult <- sprintf("%.2e", chi_test_adult$p.value)
+
+car_ownership_by_adult <- car_ownership_by_adult %>%
+  mutate(
+    category = "Number of Adults(Benchmark: 1 adult in the household",
+    group = as.character(number_of_adults_group),  # Convert to character
+    chisq.test_p_value = p_value_adult
+  ) %>%
+  select(category, group, percent_change_from_benchmark,chisq.test_p_value) %>%
+  filter(row_number() !=1)
+
+chi_test_area <- chisq.test(table(family_possessions$urban_area, family_possessions$have_car))
+ 
+p_value_area <- sprintf("%.2e", chi_test_area$p.value)
+car_ownership_by_area <- car_ownership_by_area %>%
+  mutate(
+    category = "Urban Area(Benchmark Major City)",
+    group = as.character(urban_area),  # Convert to character
+    chisq.test_p_value = p_value_area
+  ) %>%
+  select(category, group, percent_change_from_benchmark,chisq.test_p_value) %>%
+  filter(row_number() !=1)
+
+chi_test_income<- chisq.test(table(family_possessions$income_value, family_possessions$have_car))
+ 
+p_value_income <- sprintf("%.2e", chi_test_income$p.value)
+car_ownership_by_income <- car_ownership_by_income %>%
+  mutate(
+    category = "Income Group(Benchmark : No income)",
+    group = as.character(income_value),  # Convert to character
+    chisq.test_p_value = p_value_income
+  ) %>%
+  select(category, group, percent_change_from_benchmark,chisq.test_p_value) %>%
+  filter(row_number() !=4)
+
+# Combine all tables into one
+car_ownership_summary <- bind_rows(
+  car_ownership_by_children,
+  car_ownership_by_adult,
+  car_ownership_by_area,
+  car_ownership_by_income,
+  car_ownership_alone
+)
+
+# View the combined table
+car_ownership_summary %>% 
+  kable() %>%
+  kable_styling() %>%
+  row_spec(c(8:10), extra_css = "color: blue;") %>%
+  row_spec(c(4:5), extra_css = "color: red;") %>%
+  row_spec(c(6:7), 28,extra_css = "color: green;") %>%
+  row_spec(11,28, extra_css = "color: orange;")
+```
+
+The data shows a clear trend: as the number of children increases, the likelihood of car ownership rises, with a 9.5% increase for one child, 11.8% for two, and 13.9% for three or more. Similarly, the percentage of households owning a car increases by 21% as the number of adults grows. Urban area also plays a role, with car ownership higher in suburban (9.65%) and rural (14.3%) areas compared to major cities. Income follows the same pattern: higher household income correlates with increased car ownership. Additionally, individuals living alone are less likely to own a car. Importantly, the chi-square test p-value confirms that there is a statistically significant association between these variables and whether a household owns a car, reinforcing the observed patterns.
+
+
+## Predictive Analysis of Car Ownership{.tabset}
+
++ **First Model**
+```{r, echo=FALSE}
+library(caret)
+library(rpart.plot)
+library(kernlab)
+library(cowplot)
+library(randomForest)
+
+library(performanceEstimation) # for SMOTE
+
+
+
+
+index <- createDataPartition(family_possessions$have_car, p = 0.8, list = FALSE)
+X_train <- family_possessions[index, ]
+X_test <- family_possessions[-index, ]
+
+cat("Train Data:")
+table(X_train$have_car)
+
+```
+
+
+We can see that the data is imbalanced. To solve this issue we will perform the SMOTE technique:
+
+
+```{r, echo=FALSE}
+smote_train <- smote(have_car ~ ., data = X_train)
+cat("Smote Data:")
+table(smote_train$have_car)
+
+
+model <- randomForest(have_car ~ living_alone  +number_of_adults_group + + have_alternatives + number_of_children+ income_value +urban_area, data = smote_train,  importance = TRUE)
+model
+importance_scores <- model$importance
+importance_df <- as.data.frame(importance_scores)
+
+# Add variable names as a column
+importance_df$Variable <- rownames(importance_df)
+importance_df <- importance_df[order(importance_df$MeanDecreaseGini, decreasing = TRUE), ]
+
+# Plot variable importance using ggplot2
+ggplot(importance_df, aes(x = reorder(Variable, MeanDecreaseGini), y = MeanDecreaseGini)) +
+  geom_bar(stat = "identity", fill = "steelblue") +
+  coord_flip() + # Flip axes for better readability
+  theme_minimal() +
+  labs(
+    title = "Variable Importance from Random Forest Model",
+    x = "Variables",
+    y = "Importance Score"
+  )
+
+
+
+```
+
+
+The random forest model's out-of-bag (OBB) error rate is `r model$err.rate[500, "OOB"]*100` %, meaning approximately `r 100-model$err.rate[500, "OOB"]*100`% of predictions were correctly classified. Upon analyzing the variable importance, we found the four most important factors are `number_of_adults`, followed by the `income` in the household, whether there is only 1 individual `living_alone` and `urban area`. To optimize the model, we can try to remove the least important variables.
+
+
++ **Confusion Matrix Metrics**
+
+```{r, echo=FALSE}
+predictions <- predict(model, X_test)
+
+
+accuracy_lr <- mean(predictions == X_test$have_car)
+cat("Accuracy of the model: " , accuracy_lr)
+
+confusion_matrix <- confusionMatrix(predictions, X_test$have_car)
+
+cat("Confusion Matrix: Test Set:\n", capture.output(print(confusion_matrix)), sep = "\n")
+```
+The model shows an accuracy of `r confusion_matrix$overall['Accuracy']*100`, but with a significant imbalance in the class distribution, as the No Information Rate (NIR) is much higher at `r confusion_matrix$overall['No Information Rate']*100`, indicating that predicting the majority class without any model would be more accurate. The sensitivity for Class 0 is `r confusion_matrix$byClass['Sensitivity'][1]*100`, which is good, but the positive predictive value (PPV) is quite low at `r confusion_matrix$byClass['Pos Pred Value'][1]*100`, suggesting that many of the positive predictions for Class 0 are incorrect. The model's balanced accuracy of  `r confusion_matrix$overall['Accuracy']*100`` indicates that improvements are needed, especially in predicting Class 0, potentially through techniques like class balancing or model adjustments.

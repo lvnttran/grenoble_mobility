@@ -1,0 +1,248 @@
+# Insights{.tabset} 
+
+## Travel Distance and Duration Analysis
+
+
+
+```{r, echo=FALSE}
+
+# Create the first plot
+plot1 <- ggplot(filtered_data, aes(x = travel_mode, y = total_crownTravel_distance / total_trips_same_mode, fill = real_travel_mode)) +
+  geom_boxplot(outlier.color = "red") +
+  labs(
+    title = "Variation in Average Trip Distance by Travel Mode",
+    x = "Travel Mode",
+    y = "Average Trip Distance (km)"
+  ) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(0, 20000)) +
+  scale_fill_brewer(palette = "Set3")
+
+# Create the second plot
+plot2 <- ggplot(filtered_data, aes(x = travel_mode, y = total_declared_trip_duration / total_trips_same_mode, fill = real_travel_mode)) +
+  geom_boxplot(outlier.color = "red") +
+  labs(
+    title = "Variation in Average Trip Duration by Travel Mode",
+    x = "Travel Mode",
+    y = "Average Trip Duration (min)"
+  ) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(0, 100)) +
+  scale_fill_brewer(palette = "Set3")
+
+# Combine the plots side by side
+combined_plot <- plot1 | plot2
+print(combined_plot)
+```
+
+The analysis of travel distance highlights that MAP covers the shortest distances, which is expected given its localized nature. VP distances fall between TCU and TCIU, aligning with the car's flexibility for both urban and intercity travel. Interestingly, trips classified under "Autre" also cover substantial distances, indicating diverse long-distance usage. For travel duration, despite the longer distances, car trips exhibit shorter durations compared to TCU, TCIU, and "Autre." This suggests a preference for cars when time is a critical factor,
+
+
+## Location Effect on travel mode{.tabset}
+
+### Distribution of the travel mode by residence area
+
+```{r, echo=FALSE}
+filtered_data <- filtered_data %>%
+  mutate(
+    ORIG = as.numeric(as.character(ORIG)), 
+    DEST = as.numeric(as.character(DEST)),
+    residence_zone_number = as.numeric(as.character(residence_zone_number))
+  ) %>%
+  mutate(
+    ORIG_area = case_when(
+      (ORIG >= 101 & ORIG < 140) ~ "inside_grenoble",
+      (ORIG >= 501 & ORIG <= 516) ~ "inside_voiron",
+      (ORIG == 602) ~ "inside_St_Marcellin",
+      (ORIG %in% c(309, 310, 312, 313)) ~ "inside_la_touvet",
+      TRUE ~ "outside_the_city"
+    ),
+    DEST_area = case_when(
+      (DEST >= 101 & DEST < 140) ~ "inside_grenoble",
+      (DEST >= 501 & DEST <= 516) ~ "inside_voiron",
+      (DEST == 602) ~ "inside_St_Marcellin",
+      (DEST %in% c(309, 310, 312, 313)) ~ "inside_la_touvet",
+      TRUE ~ "outside_the_city"
+    ),
+    residence_area = case_when(
+      (residence_zone_number >= 101 & residence_zone_number < 140) ~ "inside_grenoble",
+      (residence_zone_number >= 501 & residence_zone_number <= 516) ~ "inside_voiron",
+      (residence_zone_number == 602) ~ "inside_St_Marcellin",
+      (residence_zone_number %in% c(309, 310, 312, 313)) ~ "inside_la_touvet",
+      TRUE ~ "outside_the_city"
+    )
+  )
+
+filtered_data <-filtered_data %>%
+  mutate(real_travel_mode = ifelse(travel_mode == "VP", "VP", "Autre"))
+
+locations_data1 <- filtered_data %>%
+  mutate(ORIG_area = ifelse(ORIG_area == "inside_grenoble" | ORIG_area == "inside_voiron"| ORIG_area == "inside_St_Marcellin"| ORIG_area == "inside_la_touvet" , "inside_the_city", "outside_the_city"),
+         DEST_area = ifelse(DEST_area == "inside_grenoble" | DEST_area == "inside_voiron"| DEST_area == "inside_St_Marcellin"| DEST_area == "inside_St_Marcellin", "inside_the_city", "outside_the_city"),
+         residence_area =ifelse(residence_area == "inside_grenoble" | residence_area == "inside_voiron"| residence_area == "inside_St_Marcellin"| residence_area == "inside_St_Marcellin", "inside_the_city", "outside_the_city") )
+
+#Car vs no car
+ggplotly(ggplot(locations_data1, aes(x = residence_area , fill =real_travel_mode)) +
+  geom_bar(position = "dodge") +
+  scale_fill_brewer(palette = "Set2") + # Change the colors
+  labs(
+    title = "Travel Mode Distribution by Residence Area",
+    x = "Travel Mode",
+    y = "Count",
+    fill = "Residence Area"
+  ) +
+  theme_minimal() +
+  theme(
+    legend.position = "top" # Move legend for better aesthetics
+  )
+)
+#inside+around
+table(locations_data1$residence_area)
+
+```
+
+The analysis indicates that car usage is evenly distributed among individuals living inside and outside the city. In contrast, other travel modes from the dataset are predominantly used within the city. This suggests that while cars offer consistent utility regardless of location, alternative modes cater more to urban travel needs.
+
+### Distribution of travel_mode by trip type
+
+```{r, echo=FALSE}
+filtered_data <- filtered_data %>%
+  mutate(
+    trip_type = case_when(
+      # Within the same city
+      (ORIG_area == "inside_grenoble" & DEST_area == "inside_grenoble") |
+      (ORIG_area == "inside_voiron" & DEST_area == "inside_voiron") |
+      (ORIG_area == "inside_la_touvet" & DEST_area == "inside_la_touvet") |
+      (ORIG_area == "inside_St_Marcellin" & DEST_area == "inside_St_Marcellin") ~ "Within_the_city",
+      
+      # From a city to outside or outside to a city
+      (ORIG_area == "inside_grenoble" & DEST_area == "outside_the_city") |
+      (ORIG_area == "inside_voiron" & DEST_area == "outside_the_city") |
+      (ORIG_area == "inside_la_touvet" & DEST_area == "outside_the_city") |
+      (ORIG_area == "inside_St_Marcellin" & DEST_area == "outside_the_city") |
+      (ORIG_area == "outside_the_city" & DEST_area == "inside_grenoble") |
+      (ORIG_area == "outside_the_city" & DEST_area == "inside_voiron") |
+      (ORIG_area == "outside_the_city" & DEST_area == "inside_la_touvet") |
+      (ORIG_area == "outside_the_city" & DEST_area == "inside_St_Marcellin") ~ "inside_outside",
+      
+      # From one city to another
+      (ORIG_area == "inside_grenoble" & DEST_area == "inside_voiron") |
+      (ORIG_area == "inside_voiron" & DEST_area == "inside_grenoble") |
+      (ORIG_area == "inside_grenoble" & DEST_area == "inside_la_touvet") |
+      (ORIG_area == "inside_la_touvet" & DEST_area == "inside_grenoble") |
+      (ORIG_area == "inside_voiron" & DEST_area == "inside_la_touvet") |
+      (ORIG_area == "inside_la_touvet" & DEST_area == "inside_voiron") |
+      (ORIG_area == "inside_grenoble" & DEST_area == "inside_St_Marcellin") |
+      (ORIG_area == "inside_St_Marcellin" & DEST_area == "inside_grenoble") |
+      (ORIG_area == "inside_voiron" & DEST_area == "inside_St_Marcellin") |
+      (ORIG_area == "inside_St_Marcellin" & DEST_area == "inside_voiron") |
+      (ORIG_area == "inside_la_touvet" & DEST_area == "inside_St_Marcellin") |
+      (ORIG_area == "inside_St_Marcellin" & DEST_area == "inside_la_touvet") ~ "city_to_city",
+      
+      # Outside to outside
+      (ORIG_area == "outside_the_city" & DEST_area == "outside_the_city") ~ "outside_the_city"
+    )
+  )
+percentages <- filtered_data %>%
+  group_by(trip_type, real_travel_mode) %>%
+  summarise(count = n(), .groups = "drop") %>%
+  group_by(trip_type) %>%
+  mutate(percentage = count / sum(count) * 100)
+  
+
+ggplotly(
+  ggplot(percentages, aes(x = trip_type , y = percentage, fill = real_travel_mode)) +
+    geom_bar(stat = "identity", position = "dodge") +  # Use stat="identity" to plot precomputed percentages
+    scale_fill_brewer(palette = "Set2") +  # Color palette for better distinction
+    labs(
+      title = "Percentage of Trip Type Usage by Travel Mode",
+      x = "Travel Mode",
+      y = "Percentage (%)",
+      fill = "Trip Type"
+    ) +
+    theme_minimal() +
+    theme(
+      legend.position = "top",  # Place legend at the top for better visibility
+      axis.text.x = element_text(angle = 45, hjust = 1)  # Rotate x-axis labels for better readability
+    )
+)
+table(filtered_data$trip_type)
+```
+
+The analysis reveals a significant disparity in trip types, with the majority of observations corresponding to trips made within the same city, such as Grenoble, Voiron, St Marcellin, or La Touvet. Alternative modes of transport are predominantly used for within-city travel, whereas cars dominate for intercity and city-to-outside trips. This highlights the reliance on cars for longer and less localized travel.
+
+### Effect of distance and duration
+```{r, echo=FALSE}
+plot1 <- ggplot(filtered_data, aes(x = trip_type, y = declared_trip_duration, fill = real_travel_mode)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 1) +
+  scale_fill_brewer(palette = "Set3") +
+  labs(
+    title = "Trip Duration by Trip Type",
+    x = "Trip Type",
+    y = "Duration ",
+    fill = "Mode"
+  ) +
+  theme_minimal() +
+  coord_cartesian(ylim = c(0, 200))
+
+plot2 <- ggplot(filtered_data, aes(x = trip_type, y = crownTravel_Distance, fill = real_travel_mode)) +
+  geom_boxplot(outlier.color = "red", outlier.shape = 1, position = position_dodge(0.8)) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(
+    title = "Trip distance by Trip Type (Car vs. No Car)",
+    x = "Trip Type",
+    y = "Distance",
+    fill = "Mode"
+  ) +
+  theme_minimal() 
+
+combined_plot <- plot1 | plot2
+print(combined_plot)
+```
+
+Analyzing distance and duration alongside trip types confirms that shorter distances correlate with trips within or just outside the city, while longer distances are associated with intercity or city-to-outside trips—an expected pattern. Within-city and outside-city trips show a preference for cars when distances increase, as they also minimize travel time. For inside-outside or city-to-city trips, the travel distance remains similar regardless of the mode, which is logical given the fixed nature of such routes. However, car users consistently achieve these trips in less time, reinforcing the car’s efficiency for longer travel.
+
+```{r, include=FALSE}
+
+#Car_availability
+ggplot(filtered_data, aes(x = car_availability, fill = real_travel_mode)) +
+  geom_bar(position = "fill") +
+  labs(x = "Distance Category", y = "Proportion of Trips")
+
+#To show the anomalies in the dataset
+car_availability1 <- filtered_data %>%
+  select(id_pers ,mode_V2,real_travel_mode,car_availability, NB_OCCU ,number_of_cars,num_people,car_at_your_disposal, POSSES1, POSSES2, POSSES3, NUM_VEH) %>%
+  filter(car_availability == 3 & real_travel_mode == "VP")
+head(car_availability1)%>% kable() %>% kable_styling()
+
+car_availability12 <- filtered_data %>% 
+  filter(id_pers %in% car_availability1$id_pers) %>%
+  group_by(id_pers) %>%
+  summarise(
+    unique_travel_mode = length(unique(travel_mode)),
+    travel_mode = paste(travel_mode, collapse = ",")
+  ) 
+
+car_availability13 <- car_availability12 %>%
+  filter(unique_travel_mode == 1)
+car_availability14 <- car_availability12 %>%
+  filter(unique_travel_mode > 1)
+head(car_availability13) %>% kable() %>% kable_styling()
+head(car_availability14) %>% kable() %>% kable_styling()
+filtered_data <- filtered_data %>%
+  filter(!(car_availability == 3 & real_travel_mode == "VP" & number_of_cars == 0)) %>%
+  mutate(
+    car_availability = case_when(
+      car_availability == 3 & real_travel_mode == "VP" & number_of_cars > 0 & id_pers %in% car_availability13$id_pers ~ 1,
+      car_availability == 3 & real_travel_mode == "VP" & number_of_cars > 0 & !(id_pers %in% car_availability13$id_pers) ~ 2,
+      TRUE ~ car_availability  # Keep original value if no conditions are met
+    )
+  )
+
+ggplot(filtered_data, aes(x = car_availability, fill = real_travel_mode)) +
+  geom_bar(position = "fill") +
+  labs(x = "Distance Category", y = "Proportion of Trips")
+
+
+
+```
